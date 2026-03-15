@@ -1,4 +1,4 @@
-import numpy as np
+'''import numpy as np
 import pandas as pd
 
 np.random.seed(42)
@@ -67,4 +67,76 @@ dataset.to_csv("accident_dataset_multiclass.csv", index=False)
 print("Dataset generated successfully!")
 print(dataset.head())
 print("\nClass distribution:")
-print(dataset["label"].value_counts())
+print(dataset["label"].value_counts())'''
+
+import numpy as np
+import pandas as pd
+
+np.random.seed(42)
+
+samples_per_class = 833   # ~5000 total for 6 classes
+data = []
+
+def generate_features(acc_min, acc_max, gyro_min, gyro_max, label):
+
+    peak_acc = np.random.uniform(acc_min, acc_max)
+    mean_acc = peak_acc * np.random.uniform(0.4, 0.8)
+    std_acc = peak_acc * np.random.uniform(0.1, 0.3)
+    acc_range = peak_acc * np.random.uniform(0.6, 1.2)
+
+    jerk_mean = np.random.uniform(acc_min/2, acc_max/2)
+
+    gyro_mean = np.random.uniform(gyro_min, gyro_max)
+    gyro_std = gyro_mean * np.random.uniform(0.1, 0.4)
+    gyro_range = gyro_mean * np.random.uniform(0.5, 1.2)
+
+    energy_acc = peak_acc**2 * np.random.uniform(0.5, 2)
+    energy_gyro = gyro_mean**2 * np.random.uniform(0.5, 2)
+
+    return [
+        peak_acc,
+        mean_acc,
+        std_acc,
+        acc_range,
+        jerk_mean,
+        gyro_mean,
+        gyro_std,
+        gyro_range,
+        energy_acc,
+        energy_gyro,
+        label
+    ]
+
+# class ranges (approx realistic)
+ranges = [
+    (0.1, 1.2, 1, 30, 0),      # normal
+    (1.0, 2.5, 20, 80, 1),     # bump
+    (2.0, 4.5, 60, 150, 2),    # hard brake
+    (4.0, 7.0, 120, 300, 3),   # minor accident
+    (6.0, 10.0, 250, 600, 4),  # major accident
+    (9.0, 16.0, 500, 1500, 5)  # critical crash
+]
+
+for acc_min, acc_max, gyro_min, gyro_max, label in ranges:
+    for _ in range(samples_per_class):
+        data.append(generate_features(acc_min, acc_max, gyro_min, gyro_max, label))
+
+columns = [
+    "peak_acc",
+    "mean_acc",
+    "std_acc",
+    "acc_range",
+    "jerk_mean",
+    "gyro_mean",
+    "gyro_std",
+    "gyro_range",
+    "energy_acc",
+    "energy_gyro",
+    "label"
+]
+
+df = pd.DataFrame(data, columns=columns)
+
+df.to_csv("mpu6050_accident_dataset_5000.csv", index=False)
+
+print("Dataset created:", df.shape)
