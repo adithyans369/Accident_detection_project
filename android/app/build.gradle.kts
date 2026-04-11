@@ -7,12 +7,12 @@ plugins {
 android {
 
     namespace = "com.example.a4safe_pulse"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.a4safe_pulse"
-        minSdk = 21
-        targetSdk = 35
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }

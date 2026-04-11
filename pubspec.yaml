@@ -5,27 +5,25 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
- sdk: ">=3.0.0 <4.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
   cupertino_icons: ^1.0.2
-  
-  #Animation (hourglass loading)
-
   lottie: ^3.1.0
-  
-  #Save user data locally
-
   shared_preferences: ^2.2.2
-  
-  #Time formatting
-
   intl: ^0.20.2
   audioplayers: ^5.2.1
-  #Language support
+  geolocator: ^13.0.2
+  url_launcher: ^6.2.5
+  onnxruntime: ^1.0.0
+  flutter_blue_plus: ^1.31.15
+  vibration: ^2.0.0
+  torch_light: ^1.0.0
+  flutter_tts: ^4.0.2
+  flutter_phone_direct_caller: ^2.1.1
 
   flutter_localizations:
     sdk: flutter
@@ -44,3 +42,4 @@ flutter:
     - assets/images/app_logo.jpeg
     - assets/animations/hourglass.json
     - assets/sounds/alarm.mpeg
+    - assets/rf_accident_model.onnx
