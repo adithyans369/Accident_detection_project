@@ -13,31 +13,26 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
 
-  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
-  final TextEditingController answerController = TextEditingController();
 
-  String selectedQuestion = "color_question";
-
-  final List<String> questions = [
-    "color_question",
-    "pet_question",
-    "city_question",
-  ];
+  bool _isValidPhone(String phone) {
+    final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+    return digitsOnly.length >= 10;
+  }
 
   Future<void> registerUser() async {
-
     final prefs = await SharedPreferences.getInstance();
 
-    String username = usernameController.text.trim();
+    String phone = phoneController.text.trim();
+    String email = emailController.text.trim();
     String password = passwordController.text.trim();
     String confirmPassword = confirmPasswordController.text.trim();
-    String answer = answerController.text.trim();
 
-    if (!mounted) return;
-
-    if (username.isEmpty || password.isEmpty || confirmPassword.isEmpty || answer.isEmpty) {
+    if (phone.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(LanguageHelper.t("fill_fields"))),
@@ -45,7 +40,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (!_isValidPhone(phone)) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LanguageHelper.t("valid_phone"))),
+      );
+      return;
+    }
+
+    if (email.isNotEmpty && !RegExp(r'\S+@\S+\.\S+').hasMatch(email)) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LanguageHelper.t("valid_email_optional"))),
+      );
+      return;
+    }
+
     if (password != confirmPassword) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(LanguageHelper.t("password_mismatch"))),
@@ -53,13 +67,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    await prefs.setString("email", username);
+    await prefs.setString("mobile", phone);
+    await prefs.setString("email", email);
     await prefs.setString("password", password);
-    await prefs.setString("securityQuestion", selectedQuestion);
-    await prefs.setString("securityAnswer", answer);
+    await prefs.setBool("loggedIn", false);
+    await prefs.setBool("emailVerified", false);
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(LanguageHelper.t("register"))),
+      SnackBar(content: Text(LanguageHelper.t("account_created"))),
     );
 
     Navigator.pop(context);
@@ -105,9 +122,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 35),
 
               InputField(
-                hint: LanguageHelper.t("email"),
-                icon: Icons.person_outline,
-                controller: usernameController,
+                hint: LanguageHelper.t("phone_number"),
+                icon: Icons.phone_android,
+                controller: phoneController,
+              ),
+
+              const SizedBox(height: 20),
+
+              InputField(
+                hint: LanguageHelper.t("email_optional"),
+                icon: Icons.email_outlined,
+                controller: emailController,
               ),
 
               const SizedBox(height: 20),
@@ -126,35 +151,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 icon: Icons.lock_outline,
                 controller: confirmPasswordController,
                 obscureText: true,
-              ),
-
-              const SizedBox(height: 20),
-
-              DropdownButtonFormField<String>(
-                value: selectedQuestion,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.help_outline),
-                  border: OutlineInputBorder(),
-                ),
-                items: questions.map((q) {
-                  return DropdownMenuItem(
-                    value: q,
-                    child: Text(LanguageHelper.t(q)),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedQuestion = value!;
-                  });
-                },
-              ),
-
-              const SizedBox(height: 20),
-
-              InputField(
-                hint: LanguageHelper.t("enter_answer"),
-                icon: Icons.question_answer_outlined,
-                controller: answerController,
               ),
 
               const SizedBox(height: 30),

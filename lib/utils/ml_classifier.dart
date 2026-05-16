@@ -8,7 +8,7 @@ class MLClassifier {
   Future<void> init() async {
     OrtEnv.instance.init();
     final sessionOptions = OrtSessionOptions();
-    final rawAssetFile = await rootBundle.load('assets/rf_accident_model.onnx');
+    final rawAssetFile = await rootBundle.load('assets/rf_accident_model_fixed.onnx');
     final bytes = rawAssetFile.buffer.asUint8List();
     _session = OrtSession.fromBuffer(bytes, sessionOptions);
     print("✅ ML Model loaded successfully");

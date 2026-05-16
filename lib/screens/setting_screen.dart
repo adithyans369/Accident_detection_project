@@ -171,7 +171,10 @@ class _SettingScreenState extends State<SettingScreen> {
               leading: const Icon(Icons.logout),
               title: Text(LanguageHelper.t("logout")),
 
-              onTap: () {
+              onTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool("loggedIn", false);
+                if (!context.mounted) return;
 
                 Navigator.pushReplacement(
                   context,

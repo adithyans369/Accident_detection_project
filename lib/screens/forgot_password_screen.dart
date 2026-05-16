@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math';
 import '../utils/language_helper.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -11,62 +14,113 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
-  final emailController = TextEditingController();
-  final answerController = TextEditingController();
+  static const platform = MethodChannel('com.example.a4safe_pulse/sms');
+
+  final phoneController = TextEditingController();
+  final otpController = TextEditingController();
   final newPasswordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
-  String securityQuestion = "";
-  bool questionLoaded = false;
+  String generatedOtp = "";
+  bool otpSent = false;
   bool allowReset = false;
 
-  Future<void> loadQuestion() async {
+  bool _isValidPhone(String phone) {
+    final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+    return digitsOnly.length >= 10;
+  }
 
+  Future<void> _sendOtp() async {
     final prefs = await SharedPreferences.getInstance();
 
-    String savedEmail = prefs.getString("email") ?? "";
-    String savedQuestion = prefs.getString("securityQuestion") ?? "";
+    final registeredPhone = prefs.getString("mobile") ?? "";
+    final enteredPhone = phoneController.text.trim();
 
-    if (emailController.text.trim() == savedEmail) {
-
-      setState(() {
-        securityQuestion = savedQuestion;
-        questionLoaded = true;
-      });
-
-    } else {
+    if (enteredPhone.isEmpty) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LanguageHelper.t("email_not_found"))),
+        SnackBar(content: Text(LanguageHelper.t("enter_phone"))),
+      );
+      return;
+    }
+
+    if (!_isValidPhone(enteredPhone)) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LanguageHelper.t("valid_phone"))),
+      );
+      return;
+    }
+
+    if (registeredPhone.isEmpty || enteredPhone != registeredPhone) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LanguageHelper.t("phone_not_found"))),
+      );
+      return;
+    }
+
+    final smsPermission = await Permission.sms.request();
+    if (!smsPermission.isGranted) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LanguageHelper.t("sms_permission_needed"))),
+      );
+      return;
+    }
+
+    generatedOtp = (Random().nextInt(900000) + 100000).toString();
+
+    try {
+      await platform.invokeMethod('sendSMS', {
+        'phone': enteredPhone,
+        'message': 'Your A4 Safe Pulse OTP is $generatedOtp',
+      });
+
+      if (!mounted) return;
+      setState(() {
+        otpSent = true;
+        allowReset = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LanguageHelper.t("otp_sent"))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LanguageHelper.t("otp_send_failed"))),
       );
     }
   }
 
-  Future<void> verifyAnswer() async {
-
-    final prefs = await SharedPreferences.getInstance();
-
-    String savedAnswer = prefs.getString("securityAnswer") ?? "";
-
-    if (answerController.text.trim() == savedAnswer) {
-
-      setState(() {
-        allowReset = true;
-      });
-
-    } else {
-
+  void _verifyOtp() {
+    if (otpController.text.trim() != generatedOtp) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LanguageHelper.t("incorrect_answer"))),
+        SnackBar(content: Text(LanguageHelper.t("incorrect_otp"))),
       );
+      return;
     }
+
+    setState(() {
+      allowReset = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(LanguageHelper.t("otp_verified"))),
+    );
   }
 
   Future<void> resetPassword() async {
-
     final prefs = await SharedPreferences.getInstance();
 
     if (newPasswordController.text != confirmPasswordController.text) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(LanguageHelper.t("password_mismatch"))),
@@ -76,6 +130,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     await prefs.setString("password", newPasswordController.text);
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(LanguageHelper.t("password_reset_success"))),
     );
@@ -100,46 +155,41 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: Column(children: [
 
             TextField(
-              controller: emailController,
+              controller: phoneController,
               decoration: InputDecoration(
-                labelText: LanguageHelper.t("email"),
-                prefixIcon: const Icon(Icons.email),
+                labelText: LanguageHelper.t("phone_number"),
+                prefixIcon: const Icon(Icons.phone),
                 border: const OutlineInputBorder(),
               ),
+              keyboardType: TextInputType.phone,
             ),
 
             const SizedBox(height: 20),
 
             ElevatedButton(
-              onPressed: loadQuestion,
-              child: Text(LanguageHelper.t("load_question")),
+              onPressed: _sendOtp,
+              child: Text(LanguageHelper.t("send_otp")),
             ),
 
             const SizedBox(height: 25),
 
-            if (questionLoaded)
+            if (otpSent)
               Column(children: [
 
-                Text(
-                  LanguageHelper.t(securityQuestion),
-                  style: const TextStyle(fontSize: 16,fontWeight: FontWeight.bold),
-                ),
-
-                const SizedBox(height: 15),
-
                 TextField(
-                  controller: answerController,
+                  controller: otpController,
                   decoration: InputDecoration(
-                    labelText: LanguageHelper.t("enter_answer"),
+                    labelText: LanguageHelper.t("enter_otp"),
                     border: const OutlineInputBorder(),
                   ),
+                  keyboardType: TextInputType.number,
                 ),
 
                 const SizedBox(height: 15),
 
                 ElevatedButton(
-                  onPressed: verifyAnswer,
-                  child: Text(LanguageHelper.t("verify_answer")),
+                  onPressed: _verifyOtp,
+                  child: Text(LanguageHelper.t("verify_otp")),
                 ),
               ]),
 

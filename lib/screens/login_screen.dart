@@ -15,24 +15,25 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
 
-  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  Future<void> loginUser() async {
+  bool _isValidPhone(String phone) {
+    final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+    return digitsOnly.length >= 10;
+  }
 
+  Future<void> loginUser() async {
     final prefs = await SharedPreferences.getInstance();
 
-    String savedEmail = prefs.getString("email") ?? "";
+    String savedPhone = prefs.getString("mobile") ?? "";
     String savedPassword = prefs.getString("password") ?? "";
 
-    String email = emailController.text.trim();
+    String phone = phoneController.text.trim();
     String password = passwordController.text.trim();
 
-    bool validEmail = RegExp(r'\S+@\S+\.\S+').hasMatch(email);
-
-    if (!mounted) return;
-
-    if (email.isEmpty || password.isEmpty) {
+    if (phone.isEmpty || password.isEmpty) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(LanguageHelper.t("enter_credentials"))),
@@ -41,16 +42,18 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (!validEmail) {
+    if (!_isValidPhone(phone)) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LanguageHelper.t("valid_email"))),
+        SnackBar(content: Text(LanguageHelper.t("valid_phone"))),
       );
 
       return;
     }
 
-    if (savedEmail.isEmpty) {
+    if (savedPhone.isEmpty) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(LanguageHelper.t("no_account"))),
@@ -59,9 +62,10 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (email == savedEmail && password == savedPassword) {
+    if (phone == savedPhone && password == savedPassword) {
 
       await prefs.setBool("loggedIn", true);
+      if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
@@ -113,12 +117,13 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 40),
 
             TextField(
-              controller: emailController,
+              controller: phoneController,
               decoration: InputDecoration(
-                labelText: LanguageHelper.t("email"),
-                prefixIcon: const Icon(Icons.email),
+                labelText: LanguageHelper.t("phone_number"),
+                prefixIcon: const Icon(Icons.phone),
                 border: const OutlineInputBorder(),
               ),
+              keyboardType: TextInputType.phone,
             ),
 
             const SizedBox(height: 20),

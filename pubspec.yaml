@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
 
+
   cupertino_icons: ^1.0.2
   lottie: ^3.1.0
   shared_preferences: ^2.2.2
@@ -20,10 +21,11 @@ dependencies:
   url_launcher: ^6.2.5
   onnxruntime: ^1.0.0
   flutter_blue_plus: ^1.31.15
-  vibration: ^2.0.0
+  vibration: ^3.1.1
   torch_light: ^1.0.0
   flutter_tts: ^4.0.2
   flutter_phone_direct_caller: ^2.1.1
+  permission_handler: ^11.3.1
 
   flutter_localizations:
     sdk: flutter
@@ -42,4 +44,4 @@ flutter:
     - assets/images/app_logo.jpeg
     - assets/animations/hourglass.json
     - assets/sounds/alarm.mpeg
-    - assets/rf_accident_model.onnx
+    - assets/rf_accident_model_fixed.onnx
