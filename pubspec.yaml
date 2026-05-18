@@ -44,4 +44,4 @@ flutter:
     - assets/images/app_logo.jpeg
     - assets/animations/hourglass.json
     - assets/sounds/alarm.mpeg
-    - assets/rf_accident_model_fixed.onnx
+    - assets/rf_accident_model_fixed-2.onnx

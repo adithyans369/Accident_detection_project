@@ -5,12 +5,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:vibration/vibration.dart';
+import 'package:torch_light/torch_light.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/language_helper.dart';
 
 class AlertScreen extends StatefulWidget {
-  const AlertScreen({super.key});
+  // ✅ FIX: Accept severity info from home_screen
+  final bool isHighPriority;
+  final int accidentClass; // 3=minor, 4=major, 5=critical
+
+  const AlertScreen({
+    super.key,
+    this.isHighPriority = false,
+    this.accidentClass = 3,
+  });
 
   @override
   State<AlertScreen> createState() => _AlertScreenState();
@@ -22,6 +33,7 @@ class _AlertScreenState extends State<AlertScreen> {
 
   String driverName = "";
   String vehicleNumber = "";
+  String location = "";
   String bloodGroup = "";
   String allergy = "";
   String timeNow = "";
@@ -32,127 +44,164 @@ class _AlertScreenState extends State<AlertScreen> {
   int countdown = 10;
   bool alertSent = false;
   bool userAcknowledged = false;
-  int smsSentCount = 0;
-  String statusText = "Preparing...";
 
-  final AudioPlayer alarmPlayer = AudioPlayer();
+  final AudioPlayer player = AudioPlayer();
+  final FlutterTts tts = FlutterTts();
 
-  // Call state
-  bool isCalling = false;
-  int callIndex = 0;
+  Timer? smsTimer;
   Timer? callTimer;
+  Timer? flashTimer;
+
+  bool isFlashOn = false;
+  bool isCalling = false;
+  int callContactIndex = 0;
+  int smsSentCount = 0;
+
+  // ✅ FIX: Severity label and color based on accident class
+  String get _severityLabel {
+    return switch (widget.accidentClass) {
+      3 => "MINOR\nACCIDENT",
+      4 => "MAJOR\nACCIDENT",
+      5 => "CRITICAL\nCRASH",
+      _ => "ACCIDENT\nDETECTED",
+    };
+  }
+
+  Color get _severityColor {
+    return switch (widget.accidentClass) {
+      3 => Colors.orange,
+      4 => Colors.red,
+      5 => Colors.red.shade900,
+      _ => Colors.red,
+    };
+  }
 
   @override
   void initState() {
     super.initState();
-    _initAll();
+    initAll();
   }
 
-  Future<void> _initAll() async {
-    await _requestPermissions();
-    await _loadUserData();
-    _getCurrentTime();
-    await _startAlarm();
-    _startCountdown();
-    _getGPSLocation();
-  }
+  Future<void> initAll() async {
+    await loadUserData();
+    getCurrentTime();
+    startAlarm();
+    startVibration();
+    startFlashlight();
+    getGPSLocation();
 
-  // ─── PERMISSIONS ─────────────────────────────────────────
-  Future<void> _requestPermissions() async {
-    await Permission.sms.request();
-    await Permission.phone.request();
-    await Permission.location.request();
+    // ✅ FIX: High priority = only 5 seconds to cancel, normal = 10 seconds
+    if (widget.isHighPriority) {
+      setState(() { countdown = 5; });
+    }
+
+    startCountdown();
   }
 
   // ─── ALARM ───────────────────────────────────────────────
-  Future<void> _startAlarm() async {
-    await alarmPlayer.setReleaseMode(ReleaseMode.loop);
-    await alarmPlayer.setVolume(1.0);
-    await alarmPlayer.play(AssetSource('sounds/alarm.mpeg'));
+  Future<void> startAlarm() async {
+    await player.setReleaseMode(ReleaseMode.loop);
+    await player.setVolume(1.0);
+    await player.play(AssetSource('sounds/alarm.mpeg'));
   }
 
-  Future<void> _stopAlarm() async {
-    await alarmPlayer.stop();
+  Future<void> stopAlarm() async {
+    await player.stop();
   }
 
-  Future<void> _lowerAlarm() async {
-    await alarmPlayer.setVolume(0.2);
+  Future<void> lowerAlarmVolume() async {
+    await player.setVolume(0.2);
   }
 
-  Future<void> _raiseAlarm() async {
-    await alarmPlayer.setVolume(1.0);
+  // ─── VIBRATION ───────────────────────────────────────────
+  Future<void> startVibration() async {
+    bool? hasVibrator = await Vibration.hasVibrator();
+    if (hasVibrator == true) {
+      Vibration.vibrate(
+        pattern: [500, 1000, 500, 1000],
+        repeat: 0,
+      );
+    }
+  }
+
+  Future<void> stopVibration() async {
+    Vibration.cancel();
+  }
+
+  // ─── FLASHLIGHT ──────────────────────────────────────────
+  void startFlashlight() {
+    flashTimer = Timer.periodic(
+      const Duration(milliseconds: 500),
+          (timer) async {
+        if (userAcknowledged) {
+          timer.cancel();
+          try {
+            await TorchLight.disableTorch();
+          } catch (_) {}
+          return;
+        }
+        try {
+          if (isFlashOn) {
+            await TorchLight.disableTorch();
+          } else {
+            await TorchLight.enableTorch();
+          }
+          isFlashOn = !isFlashOn;
+        } catch (_) {}
+      },
+    );
+  }
+
+  Future<void> stopFlashlight() async {
+    flashTimer?.cancel();
+    try {
+      await TorchLight.disableTorch();
+    } catch (_) {}
   }
 
   // ─── GPS ─────────────────────────────────────────────────
-  Future<void> _getGPSLocation() async {
+  Future<void> getGPSLocation() async {
     try {
-      LocationPermission perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
-      if (perm == LocationPermission.deniedForever) {
-        if (mounted) setState(() { gpsLink = "Location denied"; });
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() { gpsLink = "Location permission denied"; });
         return;
       }
 
-      Position pos = await Geolocator.getCurrentPosition(
+      Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () async {
-          Position? last = await Geolocator.getLastKnownPosition();
-          return last ?? Position(
-            longitude: 0, latitude: 0,
+        const Duration(seconds: 8),
+        onTimeout: () => Geolocator.getLastKnownPosition().then(
+              (pos) => pos ?? Position(
+            longitude: 0,
+            latitude: 0,
             timestamp: DateTime.now(),
-            accuracy: 0, altitude: 0,
-            altitudeAccuracy: 0, heading: 0,
-            headingAccuracy: 0, speed: 0, speedAccuracy: 0,
-          );
-        },
+            accuracy: 0,
+            altitude: 0,
+            altitudeAccuracy: 0,
+            heading: 0,
+            headingAccuracy: 0,
+            speed: 0,
+            speedAccuracy: 0,
+          ),
+        ),
       );
 
-      if (mounted) {
-        setState(() {
-          gpsLink =
-          "https://maps.google.com/?q=${pos.latitude},${pos.longitude}";
-        });
-      }
+      String link =
+          "https://maps.google.com/?q=${position.latitude},${position.longitude}";
+      if (mounted) setState(() { gpsLink = link; });
+
     } catch (e) {
       if (mounted) setState(() { gpsLink = "Location unavailable"; });
     }
   }
 
-  // ─── COUNTDOWN ───────────────────────────────────────────
-  void _startCountdown() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return false;
-      setState(() { countdown--; });
-      if (countdown == 0) {
-        await _startEmergencyProtocol();
-        return false;
-      }
-      return true;
-    });
-  }
-
-  // ─── EMERGENCY PROTOCOL ──────────────────────────────────
-  Future<void> _startEmergencyProtocol() async {
-    if (userAcknowledged) return;
-    if (mounted) setState(() {
-      alertSent = true;
-      statusText = "🚨 Sending SMS...";
-    });
-
-    // 1. Send ONE SMS to both contacts
-    await _sendSMSToAll();
-
-    // 2. Start call loop
-    _startCallLoop();
-  }
-
-  // ─── SMS — sent ONCE to both ─────────────────────────────
-  Future<void> _sendSMSToAll() async {
+  // ─── SMS ─────────────────────────────────────────────────
+  Future<void> sendEmergencySMS() async {
     String message =
         "🚨 ACCIDENT DETECTED! "
         "Driver: $driverName, "
@@ -164,101 +213,160 @@ class _AlertScreenState extends State<AlertScreen> {
         "Please respond immediately!";
 
     try {
-      // Send to both simultaneously
-      await Future.wait([
-        if (emergency1.isNotEmpty)
-          platform.invokeMethod('sendSMS', {
-            'phone': emergency1,
-            'message': message,
-          }),
-        if (emergency2.isNotEmpty)
-          platform.invokeMethod('sendSMS', {
-            'phone': emergency2,
-            'message': message,
-          }),
-      ]);
-
-      if (mounted) setState(() {
-        smsSentCount++;
-        statusText = "✅ SMS sent to both contacts!";
-      });
-      print("✅ SMS sent to both!");
-
+      if (emergency1.isNotEmpty) {
+        await platform.invokeMethod('sendSMS', {
+          'phone': emergency1,
+          'message': message,
+        });
+      }
+      if (emergency2.isNotEmpty) {
+        await platform.invokeMethod('sendSMS', {
+          'phone': emergency2,
+          'message': message,
+        });
+      }
+      if (mounted) setState(() { smsSentCount++; });
+      print("SMS sent! Count: $smsSentCount");
     } catch (e) {
-      print("❌ SMS error: $e");
-      if (mounted) setState(() {
-        statusText = "❌ SMS error: $e";
-      });
+      print("SMS failed: $e");
     }
   }
 
-  // ─── CALL LOOP ───────────────────────────────────────────
-  void _startCallLoop() {
-    // Call immediately
-    _makeNextCall();
-
-    // Then call every 15 seconds (10 sec call + 5 sec gap)
-    callTimer = Timer.periodic(
-      const Duration(seconds: 15),
-          (timer) async {
-        if (userAcknowledged) {
-          timer.cancel();
-          return;
-        }
-        await _makeNextCall();
-      },
-    );
+  // ─── WHATSAPP ────────────────────────────────────────────
+  Future<void> sendWhatsApp(String phone, String message) async {
+    try {
+      String cleanPhone = phone.replaceAll(RegExp(r'[\s\-]'), '');
+      if (!cleanPhone.startsWith('+')) {
+        cleanPhone = '+91$cleanPhone';
+      }
+      final Uri whatsappUri = Uri.parse(
+        "https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}",
+      );
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      print("WhatsApp failed: $e");
+    }
   }
 
-  Future<void> _makeNextCall() async {
+  Future<void> sendWhatsAppToAll() async {
+    String message =
+        "🚨 ACCIDENT DETECTED!\n"
+        "Driver: $driverName\n"
+        "Vehicle: $vehicleNumber\n"
+        "Blood Group: $bloodGroup\n"
+        "Allergies: $allergy\n"
+        "Time: $timeNow\n"
+        "Location: $gpsLink\n"
+        "Please respond immediately!";
+
+    if (emergency1.isNotEmpty) await sendWhatsApp(emergency1, message);
+    await Future.delayed(const Duration(seconds: 2));
+    if (emergency2.isNotEmpty) await sendWhatsApp(emergency2, message);
+  }
+
+  // ─── CALL ────────────────────────────────────────────────
+  Future<void> makeEmergencyCall() async {
     if (userAcknowledged) return;
     if (isCalling) return;
 
-    // Build contact list
-    List<String> contacts = [];
-    if (emergency1.isNotEmpty) contacts.add(emergency1);
-    if (emergency2.isNotEmpty) contacts.add(emergency2);
-    if (contacts.isEmpty) return;
-
-    // Round robin between contacts
-    String numberToCall = contacts[callIndex % contacts.length];
-    callIndex++;
-
     isCalling = true;
 
-    // Lower alarm during call
-    await _lowerAlarm();
+    await tts.setLanguage("en-US");
+    await tts.setSpeechRate(0.5);
+    await tts.setVolume(1.0);
+    await tts.speak(
+      "Accident detected! Driver $driverName needs help! Calling emergency contact now!",
+    );
 
-    if (mounted) setState(() {
-      statusText = "📞 Calling Contact ${callIndex % 2 == 1 ? '1' : '2'}...";
-    });
+    await Future.delayed(const Duration(seconds: 4));
+    await lowerAlarmVolume();
 
-    print("📞 Calling: $numberToCall");
-    await FlutterPhoneDirectCaller.callNumber(numberToCall);
+    String numberToCall =
+    callContactIndex == 0 ? emergency1 : emergency2;
 
-    // Wait 10 seconds for pickup
-    await Future.delayed(const Duration(seconds: 10));
+    if (numberToCall.isNotEmpty) {
+      print("Calling: $numberToCall");
+      await FlutterPhoneDirectCaller.callNumber(numberToCall);
+    }
 
-    // Raise alarm after call
-    await _raiseAlarm();
+    await Future.delayed(const Duration(seconds: 30));
 
-    if (mounted) setState(() {
-      statusText = "📞 Switching contact...";
-    });
-
-    isCalling = false;
+    if (!userAcknowledged) {
+      await player.setVolume(1.0);
+      callContactIndex = callContactIndex == 0 ? 1 : 0;
+      isCalling = false;
+    }
   }
 
-  // ─── USER IS OKAY ────────────────────────────────────────
-  Future<void> _userIsOkay() async {
-    userAcknowledged = true;
-    callTimer?.cancel();
-    await _stopAlarm();
+  // ─── COUNTDOWN ───────────────────────────────────────────
+  void startCountdown() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return false;
+
+      setState(() { countdown--; });
+
+      if (countdown == 0) {
+        await startEmergencyProtocol();
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // ─── MAIN EMERGENCY PROTOCOL ─────────────────────────────
+  Future<void> startEmergencyProtocol() async {
+    if (userAcknowledged) return;
+    if (mounted) setState(() { alertSent = true; });
+
+    await sendEmergencySMS();
+    await sendWhatsAppToAll();
+
+    smsTimer = Timer.periodic(const Duration(minutes: 2), (timer) async {
+      if (userAcknowledged) {
+        timer.cancel();
+        return;
+      }
+      await sendEmergencySMS();
+    });
+
+    await makeEmergencyCall();
+
+    callTimer = Timer.periodic(const Duration(seconds: 35), (timer) async {
+      if (userAcknowledged) {
+        timer.cancel();
+        return;
+      }
+      await makeEmergencyCall();
+    });
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("✅ You are safe! All alerts stopped."),
+          content: Text("🚨 Emergency protocol started!"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ─── USER IS OKAY ────────────────────────────────────────
+  Future<void> userIsOkay() async {
+    userAcknowledged = true;
+
+    smsTimer?.cancel();
+    callTimer?.cancel();
+    await stopAlarm();
+    await stopVibration();
+    await stopFlashlight();
+    await tts.stop();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ Alert cancelled. Stay safe!"),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 3),
         ),
@@ -269,12 +377,13 @@ class _AlertScreenState extends State<AlertScreen> {
   }
 
   // ─── LOAD DATA ───────────────────────────────────────────
-  Future<void> _loadUserData() async {
+  Future<void> loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
         driverName = prefs.getString("name") ?? "Unknown";
         vehicleNumber = prefs.getString("vehicle") ?? "Not set";
+        location = prefs.getString("address") ?? "Unknown";
         bloodGroup = prefs.getString("blood") ?? "Not set";
         allergy = prefs.getString("allergy") ?? "None";
         emergency1 = prefs.getString("emergency1") ?? "";
@@ -283,18 +392,24 @@ class _AlertScreenState extends State<AlertScreen> {
     }
   }
 
-  void _getCurrentTime() {
+  void getCurrentTime() {
+    final now = DateTime.now();
     if (mounted) {
       setState(() {
-        timeNow = DateFormat('hh:mm a').format(DateTime.now());
+        timeNow = DateFormat('hh:mm a').format(now);
       });
     }
   }
 
   @override
   void dispose() {
+    smsTimer?.cancel();
     callTimer?.cancel();
-    alarmPlayer.dispose();
+    flashTimer?.cancel();
+    player.dispose();
+    tts.stop();
+    stopVibration();
+    stopFlashlight();
     super.dispose();
   }
 
@@ -318,22 +433,23 @@ class _AlertScreenState extends State<AlertScreen> {
             child: Column(
               children: [
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 20),
 
+                // ✅ FIX: Severity circle with dynamic color and label
                 Center(
                   child: Container(
-                    height: 150,
-                    width: 150,
-                    decoration: const BoxDecoration(
+                    height: 160,
+                    width: 160,
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.red,
+                      color: _severityColor,
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        "ACCIDENT\nDETECTED",
+                        _severityLabel,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
+                        style: const TextStyle(
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -344,28 +460,19 @@ class _AlertScreenState extends State<AlertScreen> {
 
                 const SizedBox(height: 15),
 
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red),
-                  ),
-                  child: Text(
-                    alertSent
-                        ? "🚨 Emergency Active!\n$statusText"
-                        : "⚠️ Sending in $countdown seconds...",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
+                Text(
+                  alertSent
+                      ? "🚨 Emergency protocol active!\nSMS sent: $smsSentCount times"
+                      : "Sending alert in $countdown seconds...",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
 
-                const SizedBox(height: 15),
+                const SizedBox(height: 20),
 
                 Card(
                   child: ListTile(
@@ -376,7 +483,8 @@ class _AlertScreenState extends State<AlertScreen> {
                 ),
                 Card(
                   child: ListTile(
-                    leading: const Icon(Icons.directions_car, color: Colors.blue),
+                    leading:
+                    const Icon(Icons.directions_car, color: Colors.blue),
                     title: const Text("Vehicle"),
                     subtitle: Text(vehicleNumber),
                   ),
@@ -390,7 +498,8 @@ class _AlertScreenState extends State<AlertScreen> {
                 ),
                 Card(
                   child: ListTile(
-                    leading: const Icon(Icons.warning_amber, color: Colors.orange),
+                    leading:
+                    const Icon(Icons.warning_amber, color: Colors.orange),
                     title: const Text("Allergies"),
                     subtitle: Text(allergy),
                   ),
@@ -399,11 +508,7 @@ class _AlertScreenState extends State<AlertScreen> {
                   child: ListTile(
                     leading: const Icon(Icons.location_on, color: Colors.green),
                     title: const Text("GPS Location"),
-                    subtitle: Text(
-                      gpsLink,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    subtitle: Text(gpsLink),
                   ),
                 ),
                 Card(
@@ -414,35 +519,34 @@ class _AlertScreenState extends State<AlertScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 25),
+                const SizedBox(height: 30),
 
                 // I AM OKAY button
                 SizedBox(
                   width: double.infinity,
-                  height: 70,
+                  height: 60,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Icons.check_circle, size: 32),
+                    icon: const Icon(Icons.check_circle, size: 28),
                     label: const Text(
-                      "I AM OKAY\nSTOP ALL ALERTS",
-                      textAlign: TextAlign.center,
+                      "I AM OKAY - STOP ALERT",
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    onPressed: _userIsOkay,
+                    onPressed: userIsOkay,
                   ),
                 ),
 
                 const SizedBox(height: 15),
 
-                // Send now button
+                // Send alert now button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -460,7 +564,7 @@ class _AlertScreenState extends State<AlertScreen> {
                       style: TextStyle(fontSize: 16),
                     ),
                     onPressed: () {
-                      if (!alertSent) _startEmergencyProtocol();
+                      if (!alertSent) startEmergencyProtocol();
                     },
                   ),
                 ),
