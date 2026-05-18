@@ -8,12 +8,12 @@ import 'alert_screen.dart';
 import 'user_profile_screen.dart';
 import 'setting_screen.dart';
 
-// ─── BLE UUIDs — must match ESP32 exactly ───────────────────────────────────
+// Bluetooth UUIDs must match the ESP32 code.
 const String SERVICE_UUID     = "12345678-1234-1234-1234-123456789012";
 const String CHAR_DATA_UUID   = "87654321-4321-4321-4321-210987654321";
 const String CHAR_STATUS_UUID = "abcdef01-1234-1234-1234-abcdef012345";
 
-// ─── STATUS MODEL ────────────────────────────────────────────────────────────
+// Stores the latest ESP32 status.
 class Esp32Status {
   final String   state;
   final bool     mpuOk;
@@ -58,7 +58,7 @@ class Esp32Status {
   );
 }
 
-// ─── HOME SCREEN ─────────────────────────────────────────────────────────────
+// Main home screen.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String vehicleNumber = "";
   bool   monitoring    = true;
 
-  // ── BLE ───────────────────────────────────────────────────────────────────
+  // Bluetooth connection state.
   BluetoothDevice?         connectedDevice;
   BluetoothCharacteristic? dataChar;
   BluetoothCharacteristic? statusChar;
@@ -79,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool   isConnected = false;
   String bleStatus   = "Not connected";
 
-  // ── Status drawer state ───────────────────────────────────────────────────
+  // Status drawer values.
   Esp32Status esp32Status = Esp32Status.empty;
   int    pingCount      = 0;
   String lastPingTime   = "—";
@@ -89,12 +89,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int    totalAlerts    = 0;
   int    bufferFill     = 0;
 
-  // ── ML ─────────────────────────────────────────────────────────────────────
-  final MLClassifier           classifier  = MLClassifier();
+  // ML model and sensor buffer.
+  final MLClassifier       classifier  = MLClassifier();
   final List<List<double>> sensorBuffer = [];
   bool  isProcessing = false;
-
-  // ✅ FIX: hard cap at 50 — buffer never exceeds this
   static const int maxBufferSize = 50;
 
   @override
@@ -113,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // ── SCAN ──────────────────────────────────────────────────────────────────
+  // Start Bluetooth scan.
   Future<void> startScan() async {
     if (isScanning) return;
     setState(() { isScanning = true; bleStatus = "Scanning..."; });
@@ -140,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // ── CONNECT ───────────────────────────────────────────────────────────────
+  // Connect to the ESP32 device.
   Future<void> connectToDevice(BluetoothDevice device) async {
     setState(() { bleStatus = "Connecting..."; });
     try {
@@ -172,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ── DISCOVER SERVICES ─────────────────────────────────────────────────────
+  // Find Bluetooth services and subscribe to updates.
   Future<void> discoverServices(BluetoothDevice device) async {
     final services = await device.discoverServices();
 
@@ -213,12 +211,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ── HANDLE INCOMING DATA ──────────────────────────────────────────────────
+  // Handle data received from ESP32.
   void handleIncomingData(String data) {
     if (!monitoring) return;
     data = data.trim();
 
-    // PING heartbeat
+    // ESP32 heartbeat message.
     if (data.startsWith("PING:")) {
       final score = double.tryParse(data.substring(5)) ?? 0;
       if (mounted) {
@@ -235,17 +233,18 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // ANOMALY trigger
+    // Start collecting samples after anomaly.
     if (data.startsWith("ANOMALY:")) {
       if (isProcessing) return;
       sensorBuffer.clear();
       totalAnomalies++;
+
       if (mounted) setState(() { bufferFill = 0; });
       debugPrint("⚡ ANOMALY triggered — collecting samples...");
       return;
     }
 
-    // END → run ML
+    // End of sample collection.
     if (data == "END") {
       if (sensorBuffer.length >= 10) {
         debugPrint("Buffer complete — ${sensorBuffer.length} readings → ML");
@@ -258,10 +257,8 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Sensor data line: "ax,ay,az,gx,gy,gz"
+    // Sensor data format: ax,ay,az,gx,gy,gz.
     if (isProcessing) return;
-
-    // ✅ FIX: hard cap — never exceed 50 samples
     if (sensorBuffer.length >= maxBufferSize) return;
 
     try {
@@ -275,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ── FEATURE EXTRACTION ────────────────────────────────────────────────────
+  // Convert raw sensor readings into ML features.
   Map<String, double> extractFeatures(List<List<double>> buffer) {
     final accMag  = <double>[];
     final gyroMag = <double>[];
@@ -313,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
-  // ── ML PREDICTION ─────────────────────────────────────────────────────────
+  // Run the ML model and decide whether to alert.
   Future<void> runMLPrediction() async {
     if (sensorBuffer.isEmpty) return;
     isProcessing = true;
@@ -356,6 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {});
         debugPrint("🚨 ACCIDENT! Class: ${result.predictedClass}, "
             "Confidence: ${result.accidentConfidence.toStringAsFixed(2)}");
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -375,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ── DISCONNECT ────────────────────────────────────────────────────────────
+  // Disconnect from ESP32.
   Future<void> disconnect() async {
     await connectedDevice?.disconnect();
     if (!mounted) return;
@@ -403,7 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // ── STATUS DRAWER ─────────────────────────────────────────────────────────
+  // Build the system status drawer.
   Widget _buildStatusDrawer() {
     final bool alive = isConnected &&
         esp32Status.lastSeen.millisecondsSinceEpoch > 0 &&
@@ -416,7 +414,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return Colors.grey;
     }
 
-    // ✅ FIX: Flexible on value side — prevents 334px overflow
     Widget statusRow(IconData icon, String label, String value, {Color? color}) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -470,7 +467,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text("Sensor score",
                   style: TextStyle(fontSize: 13, color: Colors.black54)),
               Text(score.toStringAsFixed(3),
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+                  style: TextStyle(fontSize: 13,
+                      fontWeight: FontWeight.bold, color: color)),
             ],
           ),
           const SizedBox(height: 4),
@@ -499,7 +497,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(fontSize: 13, color: Colors.black54)),
               Text("$fill / 50",
                   style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                      fontSize: 13, fontWeight: FontWeight.bold,
+                      color: Colors.blueGrey)),
             ],
           ),
           const SizedBox(height: 4),
@@ -521,7 +520,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SafeArea(
         child: Column(
           children: [
-            // Header
             Container(
               width: double.infinity,
               color: Colors.redAccent,
@@ -554,15 +552,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     sectionHeader("BLE CONNECTION"),
                     statusRow(
-                      isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                      isConnected ? Icons.bluetooth_connected
+                          : Icons.bluetooth_disabled,
                       "Status",
                       isConnected ? "Connected" : "Disconnected",
                       color: isConnected ? Colors.green : Colors.red,
                     ),
                     if (isConnected)
                       statusRow(Icons.devices, "Device", "A4SafePulse"),
-                    statusRow(
-                      Icons.sensors, "Data pipeline",
+                    statusRow(Icons.sensors, "Data pipeline",
                       alive ? "Active" : "No signal",
                       color: alive ? Colors.green : Colors.orange,
                     ),
@@ -579,8 +577,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       esp32Status.mpuOk ? "OK" : "FAILED",
                       color: esp32Status.mpuOk ? Colors.green : Colors.red,
                     ),
-                    statusRow(
-                      Icons.radio_button_checked, "State",
+                    statusRow(Icons.radio_button_checked, "State",
                       esp32Status.state,
                       color: stateColor(esp32Status.state),
                     ),
@@ -602,8 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                     bufferBar(bufferFill),
                     const SizedBox(height: 12),
-                    statusRow(
-                      Icons.bolt, "Anomalies detected", "$totalAnomalies",
+                    statusRow(Icons.bolt, "Anomalies detected", "$totalAnomalies",
                       color: totalAnomalies > 0 ? Colors.orange : Colors.grey,
                     ),
 
@@ -612,15 +608,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     sectionHeader("ML RESULTS"),
                     statusRow(Icons.psychology, "Last prediction", lastPrediction),
                     if (lastConfidence > 0)
-                      statusRow(
-                        Icons.percent, "Confidence",
+                      statusRow(Icons.percent, "Confidence",
                         "${(lastConfidence * 100).toStringAsFixed(1)}%",
                         color: lastConfidence > 0.8 ? Colors.red
                             : lastConfidence > 0.5 ? Colors.orange
                             : Colors.green,
                       ),
-                    statusRow(
-                      Icons.warning_amber, "Alerts sent", "$totalAlerts",
+                    statusRow(Icons.warning_amber, "Alerts sent", "$totalAlerts",
                       color: totalAlerts > 0 ? Colors.red : Colors.grey,
                     ),
 
@@ -663,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── MAIN BUILD ────────────────────────────────────────────────────────────
+  // Build the home screen UI.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -719,10 +713,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 10),
 
-            // Driver card
+            // Driver details card.
             Card(
               elevation: 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -734,7 +729,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: Text(
                           "${LanguageHelper.t("driver")}: $driverName",
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 18,
+                              fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -758,10 +754,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 15),
 
-            // BLE card
+            // Bluetooth card.
             Card(
               elevation: 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -769,17 +766,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Row(children: [
                       Icon(
-                        isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                        isConnected ? Icons.bluetooth_connected
+                            : Icons.bluetooth_disabled,
                         color: isConnected ? Colors.green : Colors.red,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          bleStatus,
-                          style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold,
-                            color: isConnected ? Colors.green : Colors.red,
-                          ),
+                        child: Text(bleStatus,
+                          style: TextStyle(fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isConnected ? Colors.green : Colors.red),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -788,22 +784,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 8),
                       Row(children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: Colors.green.shade50,
                             border: Border.all(color: Colors.green.shade300),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(children: [
-                            const Icon(Icons.sensors, size: 12, color: Colors.green),
+                            const Icon(Icons.sensors, size: 12,
+                                color: Colors.green),
                             const SizedBox(width: 4),
                             Text("Live · ${esp32Status.state}",
-                                style: const TextStyle(fontSize: 11, color: Colors.green)),
+                                style: const TextStyle(
+                                    fontSize: 11, color: Colors.green)),
                           ]),
                         ),
                         const SizedBox(width: 8),
-                        Text("Score: ${esp32Status.compositeScore.toStringAsFixed(3)}",
-                            style: const TextStyle(fontSize: 11, color: Colors.black45)),
+                        Text(
+                          "Score: ${esp32Status.compositeScore.toStringAsFixed(3)}",
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.black45),
+                        ),
                       ]),
                     ],
                     const SizedBox(height: 10),
@@ -811,9 +813,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isConnected ? Colors.grey : Colors.blue,
+                          backgroundColor:
+                          isConnected ? Colors.grey : Colors.blue,
                         ),
-                        icon: Icon(isConnected ? Icons.bluetooth_disabled : Icons.bluetooth),
+                        icon: Icon(isConnected
+                            ? Icons.bluetooth_disabled : Icons.bluetooth),
                         label: Text(isConnected ? "Disconnect"
                             : (isScanning ? "Scanning..." : "Connect to ESP32")),
                         onPressed: isScanning ? null
@@ -827,10 +831,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 15),
 
-            // Monitoring toggle
+            // Monitoring switch.
             Card(
               elevation: 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -839,7 +844,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: Text(
                         LanguageHelper.t("monitoring_status"),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 18,
+                            fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -856,7 +862,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 15),
 
             Text(LanguageHelper.t("emergency_numbers"),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                style: const TextStyle(fontSize: 18,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Card(
               child: ListTile(
@@ -879,7 +886,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
-                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 30, vertical: 12),
                 ),
                 icon: const Icon(Icons.warning),
                 label: Text(LanguageHelper.t("send_alert"),

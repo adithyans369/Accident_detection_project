@@ -21,9 +21,9 @@ def generate_features(mean_vals, std_vals, label, n):
     }
     return pd.DataFrame(data)
 
-# ---------- Class definitions ----------
+# Class definitions.
 
-# 0️⃣ Normal motion
+# Class 0: normal motion.
 normal = generate_features(
     mean_vals=[12, 9.8, 0.8, 3, 0.5, 0.3, 0.2, 0.8, 900, 40],
     std_vals=[2, 0.5, 0.2, 1, 0.2, 0.1, 0.05, 0.2, 100, 10],
@@ -31,7 +31,7 @@ normal = generate_features(
     n=SAMPLES_PER_CLASS
 )
 
-# 1️⃣ Sudden brake
+# Class 1: sudden brake.
 brake = generate_features(
     mean_vals=[18, 11, 2, 7, 2, 0.8, 0.3, 1.5, 1600, 90],
     std_vals=[3, 1, 0.5, 2, 0.5, 0.2, 0.1, 0.3, 200, 20],
@@ -39,7 +39,7 @@ brake = generate_features(
     n=SAMPLES_PER_CLASS
 )
 
-# 2️⃣ Pothole / bump
+# Class 2: pothole or bump.
 pothole = generate_features(
     mean_vals=[16, 10.5, 1.8, 6, 1.5, 0.6, 0.25, 1.2, 1400, 70],
     std_vals=[2.5, 0.8, 0.4, 1.5, 0.4, 0.15, 0.08, 0.25, 180, 15],
@@ -47,7 +47,7 @@ pothole = generate_features(
     n=SAMPLES_PER_CLASS
 )
 
-# 3️⃣ Accident (high impact)
+# Class 3: high impact accident.
 accident = generate_features(
     mean_vals=[28, 15, 4, 18, 6, 3, 2, 8, 4500, 900],
     std_vals=[4, 2, 1, 4, 1.5, 0.8, 0.5, 2, 800, 200],
@@ -55,13 +55,13 @@ accident = generate_features(
     n=SAMPLES_PER_CLASS
 )
 
-# ---------- Combine dataset ----------
+# Combine all classes.
 dataset = pd.concat([normal, brake, pothole, accident], ignore_index=True)
 
-# Shuffle dataset
+# Shuffle the rows.
 dataset = dataset.sample(frac=1).reset_index(drop=True)
 
-# Save
+# Save the dataset.
 dataset.to_csv("accident_dataset_multiclass.csv", index=False)
 
 print("Dataset generated successfully!")
@@ -74,7 +74,7 @@ import pandas as pd
 
 np.random.seed(42)
 
-samples_per_class = 833   # ~5000 total for 6 classes
+samples_per_class = 833   # About 5000 rows for 6 classes.
 data = []
 
 def generate_features(acc_min, acc_max, gyro_min, gyro_max, label):
@@ -107,14 +107,14 @@ def generate_features(acc_min, acc_max, gyro_min, gyro_max, label):
         label
     ]
 
-# class ranges (approx realistic)
+# Value ranges for each class.
 ranges = [
-    (0.1, 1.2, 1, 30, 0),      # normal
-    (1.0, 2.5, 20, 80, 1),     # bump
-    (2.0, 4.5, 60, 150, 2),    # hard brake
-    (4.0, 7.0, 120, 300, 3),   # minor accident
-    (6.0, 10.0, 250, 600, 4),  # major accident
-    (9.0, 16.0, 500, 1500, 5)  # critical crash
+    (0.1, 1.2, 1, 30, 0),      # Normal.
+    (1.0, 2.5, 20, 80, 1),     # Bump.
+    (2.0, 4.5, 60, 150, 2),    # Hard brake.
+    (4.0, 7.0, 120, 300, 3),   # Minor accident.
+    (6.0, 10.0, 250, 600, 4),  # Major accident.
+    (9.0, 16.0, 500, 1500, 5)  # Critical crash.
 ]
 
 for acc_min, acc_max, gyro_min, gyro_max, label in ranges:

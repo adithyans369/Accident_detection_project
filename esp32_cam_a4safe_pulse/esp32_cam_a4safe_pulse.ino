@@ -18,12 +18,12 @@
 #define POST_ANOMALY_SAMPLES 50
 #define COOLDOWN_MS 3000
 
-// Keep true for Arduino Serial Plotter. Set false for readable Serial Monitor logs.
+// Set true for Serial Plotter output. Set false for readable logs.
 const bool serialPlotterMode = true;
 
-// MPU6050 full-scale spectrum after configuration below:
-// accel magnitude: 0g to 16g, gyro magnitude: 0dps to 2000dps.
-// Lower 50% => Normal. Upper 50% => Anomaly.
+// MPU6050 range after setup:
+// acceleration: 0g to 16g, gyro: 0dps to 2000dps.
+// Lower half is normal. Upper half is anomaly.
 const float anomalyThreshold = 0.50;
 
 MPU6050 mpu;
@@ -100,12 +100,12 @@ SensorData readSensor() {
 
   SensorData sample;
 
-  // MPU6050 +/-16g range => 2048 LSB/g.
+  // Convert raw acceleration to g.
   sample.ax = rawAx / 2048.0;
   sample.ay = rawAy / 2048.0;
   sample.az = rawAz / 2048.0;
 
-  // MPU6050 +/-2000 deg/s range => 16.4 LSB/(deg/s).
+  // Convert raw gyro values to degrees per second.
   sample.gx = rawGx / 16.4;
   sample.gy = rawGy / 16.4;
   sample.gz = rawGz / 16.4;

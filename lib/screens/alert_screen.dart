@@ -13,9 +13,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../utils/language_helper.dart';
 
 class AlertScreen extends StatefulWidget {
-  // ✅ FIX: Accept severity info from home_screen
+  // Severity details passed from the home screen.
   final bool isHighPriority;
-  final int accidentClass; // 3=minor, 4=major, 5=critical
+  final int accidentClass; // 3 = minor, 4 = major, 5 = critical.
 
   const AlertScreen({
     super.key,
@@ -57,7 +57,7 @@ class _AlertScreenState extends State<AlertScreen> {
   int callContactIndex = 0;
   int smsSentCount = 0;
 
-  // ✅ FIX: Severity label and color based on accident class
+  // Label and color based on accident class.
   String get _severityLabel {
     return switch (widget.accidentClass) {
       3 => "MINOR\nACCIDENT",
@@ -90,7 +90,7 @@ class _AlertScreenState extends State<AlertScreen> {
     startFlashlight();
     getGPSLocation();
 
-    // ✅ FIX: High priority = only 5 seconds to cancel, normal = 10 seconds
+    // High priority alerts use a shorter countdown.
     if (widget.isHighPriority) {
       setState(() { countdown = 5; });
     }
@@ -98,7 +98,7 @@ class _AlertScreenState extends State<AlertScreen> {
     startCountdown();
   }
 
-  // ─── ALARM ───────────────────────────────────────────────
+  // Alarm sound.
   Future<void> startAlarm() async {
     await player.setReleaseMode(ReleaseMode.loop);
     await player.setVolume(1.0);
@@ -113,7 +113,7 @@ class _AlertScreenState extends State<AlertScreen> {
     await player.setVolume(0.2);
   }
 
-  // ─── VIBRATION ───────────────────────────────────────────
+  // Phone vibration.
   Future<void> startVibration() async {
     bool? hasVibrator = await Vibration.hasVibrator();
     if (hasVibrator == true) {
@@ -128,7 +128,7 @@ class _AlertScreenState extends State<AlertScreen> {
     Vibration.cancel();
   }
 
-  // ─── FLASHLIGHT ──────────────────────────────────────────
+  // Flashlight blinking.
   void startFlashlight() {
     flashTimer = Timer.periodic(
       const Duration(milliseconds: 500),
@@ -159,7 +159,7 @@ class _AlertScreenState extends State<AlertScreen> {
     } catch (_) {}
   }
 
-  // ─── GPS ─────────────────────────────────────────────────
+  // GPS location.
   Future<void> getGPSLocation() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -200,7 +200,7 @@ class _AlertScreenState extends State<AlertScreen> {
     }
   }
 
-  // ─── SMS ─────────────────────────────────────────────────
+  // Emergency SMS.
   Future<void> sendEmergencySMS() async {
     String message =
         "🚨 ACCIDENT DETECTED! "
@@ -232,7 +232,7 @@ class _AlertScreenState extends State<AlertScreen> {
     }
   }
 
-  // ─── WHATSAPP ────────────────────────────────────────────
+  // WhatsApp message.
   Future<void> sendWhatsApp(String phone, String message) async {
     try {
       String cleanPhone = phone.replaceAll(RegExp(r'[\s\-]'), '');
@@ -266,7 +266,7 @@ class _AlertScreenState extends State<AlertScreen> {
     if (emergency2.isNotEmpty) await sendWhatsApp(emergency2, message);
   }
 
-  // ─── CALL ────────────────────────────────────────────────
+  // Emergency call.
   Future<void> makeEmergencyCall() async {
     if (userAcknowledged) return;
     if (isCalling) return;
@@ -300,7 +300,7 @@ class _AlertScreenState extends State<AlertScreen> {
     }
   }
 
-  // ─── COUNTDOWN ───────────────────────────────────────────
+  // Countdown before sending alerts.
   void startCountdown() {
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
@@ -316,7 +316,7 @@ class _AlertScreenState extends State<AlertScreen> {
     });
   }
 
-  // ─── MAIN EMERGENCY PROTOCOL ─────────────────────────────
+  // Send emergency messages and start calls.
   Future<void> startEmergencyProtocol() async {
     if (userAcknowledged) return;
     if (mounted) setState(() { alertSent = true; });
@@ -352,7 +352,7 @@ class _AlertScreenState extends State<AlertScreen> {
     }
   }
 
-  // ─── USER IS OKAY ────────────────────────────────────────
+  // Stop the alert when the user confirms safety.
   Future<void> userIsOkay() async {
     userAcknowledged = true;
 
@@ -376,7 +376,7 @@ class _AlertScreenState extends State<AlertScreen> {
     }
   }
 
-  // ─── LOAD DATA ───────────────────────────────────────────
+  // Load user and emergency contact data.
   Future<void> loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
@@ -413,7 +413,7 @@ class _AlertScreenState extends State<AlertScreen> {
     super.dispose();
   }
 
-  // ─── UI ──────────────────────────────────────────────────
+  // Build alert screen UI.
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -435,7 +435,7 @@ class _AlertScreenState extends State<AlertScreen> {
 
                 const SizedBox(height: 20),
 
-                // ✅ FIX: Severity circle with dynamic color and label
+                // Severity indicator.
                 Center(
                   child: Container(
                     height: 160,
@@ -521,7 +521,7 @@ class _AlertScreenState extends State<AlertScreen> {
 
                 const SizedBox(height: 30),
 
-                // I AM OKAY button
+                // User safety confirmation button.
                 SizedBox(
                   width: double.infinity,
                   height: 60,
@@ -546,7 +546,7 @@ class _AlertScreenState extends State<AlertScreen> {
 
                 const SizedBox(height: 15),
 
-                // Send alert now button
+                // Manual alert button.
                 SizedBox(
                   width: double.infinity,
                   height: 50,

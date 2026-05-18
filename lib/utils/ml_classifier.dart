@@ -15,7 +15,7 @@ class MLClassifier {
     print("✅ ML Model loaded successfully");
   }
 
-  /// Returns the raw predicted class label (0–5)
+  /// Returns the predicted class label from 0 to 5.
   Future<int> predict({
     required double peakAcc,
     required double meanAcc,
@@ -49,7 +49,7 @@ class MLClassifier {
     return prediction;
   }
 
-  /// Returns probability of accident (sum of classes 3+4+5 probabilities)
+  /// Returns the predicted class and accident confidence.
   Future<MLResult> predictWithConfidence({
     required double peakAcc,
     required double meanAcc,
@@ -74,8 +74,8 @@ class MLClassifier {
     final outputs =
     await _session!.runAsync(OrtRunOptions(), {'float_input': inputTensor});
 
-    // Output[0] = predicted class label (int64)
-    // ✅ FIX: safe cast with (num).toInt() — ONNX returns int64 not Dart int
+    // First output is the predicted class label.
+    // ONNX may return the value as int64, so convert it safely.
     final labelOutput = outputs?[0]?.value as List<dynamic>;
     final predictedClass = (labelOutput[0] as num).toInt();
 
@@ -85,9 +85,8 @@ class MLClassifier {
       final probOutput = outputs[1]?.value;
       if (probOutput != null) {
         try {
-          // ✅ FIX: zipmap=False → output[1] is List<List<double>>
-          // NOT a Map — plain float array, index = class number
-          // [p0, p1, p2, p3, p4, p5]  ← 6 floats, one per class
+          // Second output is a probability list.
+          // Index 0 to 5 matches class 0 to 5.
           final outerList = probOutput as List<dynamic>;
           final probList  = outerList[0] as List<dynamic>;
 
@@ -108,7 +107,7 @@ class MLClassifier {
         accidentConfidence = _confidenceFromClass(predictedClass);
       }
     } else {
-      // Only 1 output — fallback to label-based confidence
+      // Use label-based confidence if probabilities are not available.
       accidentConfidence = _confidenceFromClass(predictedClass);
     }
 
@@ -124,7 +123,7 @@ class MLClassifier {
     );
   }
 
-  /// Fallback confidence when probability array is unavailable
+  /// Gives a simple confidence value when probabilities are unavailable.
   double _confidenceFromClass(int cls) {
     return switch (cls) {
       3 => 0.65,
@@ -142,9 +141,9 @@ class MLClassifier {
 
 class MLResult {
   final int predictedClass;
-  final double accidentConfidence; // 0.0 to 1.0
+  final double accidentConfidence; // Value from 0.0 to 1.0.
 
-  // Lower = 0.25 for demo — raise to 0.50 for production
+  // Thresholds used to decide alert priority.
   static const double lowerThreshold = 0.25;
   static const double upperThreshold = 0.50;
 
@@ -153,7 +152,7 @@ class MLResult {
       accidentConfidence < upperThreshold;
   bool get isHighPriorityAlert => accidentConfidence >= upperThreshold;
 
-  // Classes 3, 4, 5 = accident
+  // Classes 3, 4, and 5 are accident classes.
   bool get isAccidentClass => predictedClass >= 3;
 
   MLResult({

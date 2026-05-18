@@ -21,7 +21,7 @@ class _SettingScreenState extends State<SettingScreen> {
     loadLanguage();
   }
 
-  /// Load saved language
+  /// Load the saved language.
   Future<void> loadLanguage() async {
 
     final prefs = await SharedPreferences.getInstance();
@@ -33,7 +33,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
   }
 
-  /// Change language
+  /// Save the selected language.
   Future<void> changeLanguage(String lang) async {
 
     final prefs = await SharedPreferences.getInstance();
@@ -70,7 +70,7 @@ class _SettingScreenState extends State<SettingScreen> {
         child: Column(
           children: [
 
-            /// Language
+            /// Language section.
             ListTile(
               leading: const Icon(Icons.language),
               title: Text(LanguageHelper.t("language")),
@@ -101,7 +101,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
             const Divider(),
 
-            /// Help & Support
+            /// Help section.
             ListTile(
               leading: const Icon(Icons.support_agent),
               title: Text(LanguageHelper.t("help_support")),
@@ -130,7 +130,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
             const Divider(),
 
-            /// Emergency contacts
+            /// Emergency contact section.
             ListTile(
               leading: const Icon(Icons.phone),
               title: Text(LanguageHelper.t("emergency_contacts")),
@@ -166,7 +166,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
             const Divider(),
 
-            /// Logout
+            /// Logout section.
             ListTile(
               leading: const Icon(Icons.logout),
               title: Text(LanguageHelper.t("logout")),

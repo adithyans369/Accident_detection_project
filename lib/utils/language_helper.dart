@@ -88,7 +88,7 @@ class LanguageHelper {
       "location_unknown": "Location Unknown",
       "not_set": "Not Set",
 
-      /// SECURITY QUESTIONS
+      /// Security questions.
       "color_question": "What is your favourite color?",
       "pet_question": "What is your pet's name?",
       "city_question": "What city were you born in?",
@@ -177,7 +177,7 @@ class LanguageHelper {
       "location_unknown": "ലൊക്കേഷൻ ലഭ്യമല്ല",
       "not_set": "സജ്ജമാക്കിയിട്ടില്ല",
 
-      /// SECURITY QUESTIONS
+      /// Security questions.
       "color_question": "നിങ്ങളുടെ പ്രിയപ്പെട്ട നിറം എന്താണ്?",
       "pet_question": "നിങ്ങളുടെ വളർത്തുമൃഗത്തിന്റെ പേര് എന്താണ്?",
       "city_question": "നിങ്ങൾ ജനിച്ച നഗരം ഏത്?",
