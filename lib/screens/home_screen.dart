@@ -148,14 +148,14 @@ class _HomeScreenState extends State<HomeScreen> {
         connectedDevice = device;
         isConnected     = true;
         isScanning      = false;
-        bleStatus       = "Connected to A4SafePulse ✅";
+        bleStatus       = "Connected to A4SafePulse";
       });
 
       device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected && mounted) {
           setState(() {
             isConnected  = false;
-            bleStatus    = "Disconnected ❌";
+            bleStatus    = "Disconnected";
             dataChar     = null;
             statusChar   = null;
             esp32Status  = Esp32Status.empty;
@@ -186,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
           c.onValueReceived.listen((value) {
             handleIncomingData(String.fromCharCodes(value));
           });
-          debugPrint("✅ Data characteristic subscribed");
+          debugPrint("Data characteristic subscribed");
         }
 
         if (uuid == CHAR_STATUS_UUID.toLowerCase()) {
@@ -205,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() { esp32Status = Esp32Status.fromString(raw); });
             }
           } catch (_) {}
-          debugPrint("✅ Status characteristic subscribed");
+          debugPrint("Status characteristic subscribed");
         }
       }
     }
@@ -240,7 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
       totalAnomalies++;
 
       if (mounted) setState(() { bufferFill = 0; });
-      debugPrint("⚡ ANOMALY triggered — collecting samples...");
+      debugPrint("ANOMALY triggered — collecting samples...");
       return;
     }
 
@@ -337,8 +337,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           lastPrediction = result.isAccidentClass
-              ? "🚨 Accident (class ${result.predictedClass})"
-              : "✅ No accident (class ${result.predictedClass})";
+              ? "Accident (class ${result.predictedClass})"
+              : "No accident (class ${result.predictedClass})";
           lastConfidence = result.accidentConfidence;
         });
       }
@@ -351,7 +351,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } else if (mounted) {
         totalAlerts++;
         setState(() {});
-        debugPrint("🚨 ACCIDENT! Class: ${result.predictedClass}, "
+        debugPrint("ACCIDENT! Class: ${result.predictedClass}, "
             "Confidence: ${result.accidentConfidence.toStringAsFixed(2)}");
 
         Navigator.push(

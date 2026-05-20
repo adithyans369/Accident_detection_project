@@ -12,7 +12,7 @@ class MLClassifier {
     await rootBundle.load('assets/rf_accident_model_fixed-2.onnx');
     final bytes = rawAssetFile.buffer.asUint8List();
     _session = OrtSession.fromBuffer(bytes, sessionOptions);
-    print("✅ ML Model loaded successfully");
+    print("ML Model loaded successfully");
   }
 
   /// Returns the predicted class label from 0 to 5.
@@ -95,12 +95,12 @@ class MLClassifier {
           double p5 = probList.length > 5 ? (probList[5] as num).toDouble() : 0.0;
           accidentConfidence = p3 + p4 + p5;
 
-          print("📊 p3:${p3.toStringAsFixed(3)} "
+          print("p3:${p3.toStringAsFixed(3)} "
               "p4:${p4.toStringAsFixed(3)} "
               "p5:${p5.toStringAsFixed(3)} "
               "total:${accidentConfidence.toStringAsFixed(3)}");
         } catch (e) {
-          print("⚠️ Prob parse error: $e — using label fallback");
+          print("Prob parse error: $e — using label fallback");
           accidentConfidence = _confidenceFromClass(predictedClass);
         }
       } else {

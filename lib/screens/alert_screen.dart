@@ -41,7 +41,7 @@ class _AlertScreenState extends State<AlertScreen> {
   String emergency2 = "";
   String gpsLink = "Fetching location...";
 
-  int countdown = 10;
+  int countdown = 5;
   bool alertSent = false;
   bool userAcknowledged = false;
 
@@ -203,7 +203,7 @@ class _AlertScreenState extends State<AlertScreen> {
   // Emergency SMS.
   Future<void> sendEmergencySMS() async {
     String message =
-        "🚨 ACCIDENT DETECTED! "
+        "ACCIDENT DETECTED! "
         "Driver: $driverName, "
         "Vehicle: $vehicleNumber, "
         "Blood Group: $bloodGroup, "
@@ -252,7 +252,7 @@ class _AlertScreenState extends State<AlertScreen> {
 
   Future<void> sendWhatsAppToAll() async {
     String message =
-        "🚨 ACCIDENT DETECTED!\n"
+        "ACCIDENT DETECTED!\n"
         "Driver: $driverName\n"
         "Vehicle: $vehicleNumber\n"
         "Blood Group: $bloodGroup\n"
@@ -345,7 +345,7 @@ class _AlertScreenState extends State<AlertScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("🚨 Emergency protocol started!"),
+          content: Text("Emergency protocol started!"),
           backgroundColor: Colors.red,
         ),
       );
